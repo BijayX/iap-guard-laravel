@@ -217,3 +217,16 @@ it('retries the upsert when a claim inserts the record first, and never changes 
         ->and($result->userId)->toBe('user-1')
         ->and(store()->findByKey(Platform::Google, 'gp-sub-token-1')?->version)->toBe(3);
 });
+
+it('ignores notifications about a replaced token of an upgraded chain', function () {
+    fakePlay(subscriptions: ['gp-sub-token-1' => 'expired', 'gp-sub-token-2' => 'upgraded']);
+    guard()->claim('user-1', PurchaseProof::google('subscription', 'gp-sub-token-1'));
+    guard()->claim('user-1', PurchaseProof::google('subscription', 'gp-sub-token-2'));
+
+    $result = handleRtdn('subscriptionExpired'); // about gp-sub-token-1
+
+    expect($result->stale)->toBeTrue()
+        ->and($result->purchase?->purchaseToken)->toBe('gp-sub-token-2')
+        ->and($result->purchase?->status->value)->toBe('active')
+        ->and(guard()->entitlements('user-1'))->toHaveCount(1);
+});

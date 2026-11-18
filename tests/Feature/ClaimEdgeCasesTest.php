@@ -251,6 +251,22 @@ it('#8 does not let another user claim an old token of an owned chain', function
     expect(store()->findByKey(Platform::Google, 'gp-sub-token-1')?->userId)->toBe('user-1');
 });
 
+it('#8 never lets an old token of the chain roll back the current state', function () {
+    // After an upgrade Play reports the replaced token as expired/canceled.
+    fakePlay(subscriptions: ['gp-sub-token-1' => 'expired', 'gp-sub-token-2' => 'upgraded']);
+    claimGoogleSub('user-1', 'gp-sub-token-1');
+    claimGoogleSub('user-1', 'gp-sub-token-2');
+
+    $again = claimGoogleSub('user-1', 'gp-sub-token-1');
+
+    expect($again->ownership)->toBe(Ownership::Existing)
+        ->and($again->isNew)->toBeFalse()
+        ->and($again->isEntitled)->toBeTrue()
+        ->and($again->purchase->purchaseToken)->toBe('gp-sub-token-2')
+        ->and($again->purchase->productId)->toBe('premium_yearly')
+        ->and($again->purchase->status->value)->toBe('active');
+});
+
 it('#9 keeps an Apple upgrade within a subscription group in the same record', function () {
     claimApple('user-1', 'subscriptionActive');
     $upgraded = claimApple('user-1', 'subscriptionUpgraded');

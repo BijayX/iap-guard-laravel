@@ -81,7 +81,8 @@ final readonly class StateSynchronizer
                 continue;
             }
 
-            $stale = Time::toMs($purchase->signedAt) < Time::toMs($record->lastEventAt);
+            $stale = $record->isSupersededBy($purchase)
+                || Time::toMs($purchase->signedAt) < Time::toMs($record->lastEventAt);
             $newTokens = array_diff($tokens, $record->tokens);
 
             if ($stale && $newTokens === []) {

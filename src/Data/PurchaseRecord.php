@@ -88,6 +88,18 @@ final readonly class PurchaseRecord
     }
 
     /**
+     * True when $purchase is an older Google token of this chain (replaced by an upgrade,
+     * downgrade or resubscribe). Its state — usually canceled/expired by the replacement —
+     * must never overwrite the current token's state, even though it was fetched just now.
+     */
+    public function isSupersededBy(Purchase $purchase): bool
+    {
+        return $purchase->purchaseToken !== null
+            && $this->purchase->purchaseToken !== $purchase->purchaseToken
+            && $this->hasToken($purchase->purchaseToken);
+    }
+
+    /**
      * @param  array<array-key, string|null>  $tokens
      * @return list<string>
      */

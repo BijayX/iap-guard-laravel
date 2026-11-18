@@ -157,8 +157,10 @@ final readonly class ClaimProcessor
                 $previousUserId = $record->userId;
             }
 
-            // Stale proofs still prove ownership but never roll the stored state back.
-            $newer = Time::toMs($purchase->signedAt) >= Time::toMs($record->lastEventAt);
+            // Stale proofs (and older Google tokens of the chain) still prove ownership but never
+            // roll the stored state back.
+            $newer = ! $record->isSupersededBy($purchase)
+                && Time::toMs($purchase->signedAt) >= Time::toMs($record->lastEventAt);
 
             $next = $record->next(
                 $now,

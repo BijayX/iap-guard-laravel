@@ -327,19 +327,22 @@ ClaimResult {
 4. loop (max 3 attempts, then IapError CONCURRENT_MODIFICATION):
      record = store.findByKey(platform, key)
      if record is null:
-         insert new record { userId, purchase, tokens: [purchaseToken?, linked?], version: 1 }
+         insert new record { userId, purchase, tokens: [purchaseToken?, linked?], claimedAt: now, version: 1 }
          if insert returned false (another device won the race) → continue loop
          ownership = "created"; isNew = true
      else:
-         isNew = record has never seen this transaction:
+         isNew = record.claimedAt is null (stored by a webhook, never claimed — e.g. ONE_TIME_CHARGE / RTDN before the app called claim)
+                 OR record has never seen this transaction:
                  apple: record.purchase.transactionId != purchase.transactionId AND purchase.signedAt > record.lastEventAt
                  google: purchase.purchaseToken not in record.tokens
          if record.userId is null or == userId → ownership = record.userId ? "existing" : "created"
          else (owned by someone else) → conflictPolicy:
              "reject"   → throw OwnershipError(ALREADY_OWNED)   // message never reveals the other user
              "transfer" → ownership = "transferred"; previousUserId = record.userId
-         newer = purchase.signedAt >= record.lastEventAt         // stale proofs never roll state back
-         next = { ...record, userId, purchase: newer ? purchase : record.purchase,
+         superseded = google && purchase.purchaseToken in record.tokens && purchase.purchaseToken != record.purchase.purchaseToken
+                      // an older token of the chain: Play reports it canceled/expired after an upgrade
+         newer = !superseded && purchase.signedAt >= record.lastEventAt   // stale proofs never roll state back
+         next = { ...record, userId, claimedAt: record.claimedAt ?? now, purchase: newer ? purchase : record.purchase,
                   lastEventAt: max(...), tokens: record.tokens ∪ {purchaseToken, linked}, version: record.version + 1 }
          if not store.replace(next, record.version) → continue loop   // optimistic concurrency
 5. acknowledge/consume (google, §7.7)
@@ -420,8 +423,8 @@ NotificationResult {
 ```
 
 Processing order: authenticate → parse → dedupe (`store.rememberNotification(platform, id)`, false → duplicate) →
-refresh state → upsert record (never change `userId`, never roll back: only write when `purchase.signedAt >= record.lastEventAt`,
-else `stale=true`) → Google acknowledge if owned (§7.7) → return.
+refresh state → upsert record (never change `userId`, never roll back: only write when `purchase.signedAt >= record.lastEventAt`
+and the purchase is not a superseded Google token (§7.3), else `stale=true`) → Google acknowledge if owned (§7.7) → return.
 
 If processing throws after `rememberNotification`, call `store.forgetNotification(platform, id)` before rethrowing,
 so the store's retry is not treated as a duplicate. HTTP layer returns 200 for success/duplicate/stale,
@@ -520,7 +523,10 @@ interface PurchaseStore {
   forgetNotification(platform, id): Promise<void>
 }
 PurchaseRecord { platform, key, userId: string|null, purchase: Purchase, tokens: string[],
-                 lastEventAt: Date, version: int, createdAt: Date, updatedAt: Date }
+                 lastEventAt: Date, claimedAt: Date|null, version: int, createdAt: Date, updatedAt: Date }
+
+`claimedAt` is set by the first successful claim and never cleared (not even by `releaseUser`), so a released
+consumable can't be re-granted to a new account. Records inserted by webhooks start with `claimedAt = null`.
 ```
 
 Node ships `MemoryPurchaseStore` (tests/dev) and documents an SQL recipe (unique `(platform,key)`,
