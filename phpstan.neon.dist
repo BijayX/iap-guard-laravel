@@ -1,0 +1,10 @@
+includes:
+    - vendor/larastan/larastan/extension.neon
+
+parameters:
+    level: 8
+    paths:
+        - src
+        # A minimal User model that uses the HasPurchases trait, so the trait is analysed.
+        - tests/Support
+    tmpDir: build/phpstan
