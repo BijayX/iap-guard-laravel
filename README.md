@@ -1,5 +1,11 @@
 # IAP Guard for Laravel
 
+[![Latest Version on Packagist](https://img.shields.io/packagist/v/bijayx/iap-guard-laravel.svg)](https://packagist.org/packages/bijayx/iap-guard-laravel)
+[![Total Downloads](https://img.shields.io/packagist/dt/bijayx/iap-guard-laravel.svg)](https://packagist.org/packages/bijayx/iap-guard-laravel)
+[![CI](https://github.com/BijayX/iap-guard-laravel/actions/workflows/ci.yml/badge.svg)](https://github.com/BijayX/iap-guard-laravel/actions/workflows/ci.yml)
+[![PHP Version](https://img.shields.io/packagist/dependency-v/bijayx/iap-guard-laravel/php.svg)](https://packagist.org/packages/bijayx/iap-guard-laravel)
+[![License: MIT](https://img.shields.io/packagist/l/bijayx/iap-guard-laravel.svg)](LICENSE)
+
 Server-side verification **and ownership protection** for Apple App Store and Google Play
 in-app purchases.
 
